@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Data Visualization for Realtime Event Feedback</title>
+</head>
+
+<link href="bootstrap/css/bootstrap.min.css" rel="stylesheet">
+<link href="dcjs/dc.css" rel="stylesheet">
+<style>
+
+path.link {
+  fill: none;
+  stroke: #666;
+  stroke-width: 1.5px;
+}
+
+path.link.twofive {
+  opacity: 0.25;
+}
+
+path.link.fivezero {
+  opacity: 0.50;
+}
+
+path.link.sevenfive {
+  opacity: 0.75;
+}
+
+path.link.onezerozero {
+  opacity: 1.0;
+}
+
+
+circle {
+  fill: #ccc;
+  stroke: #ccc;
+  stroke-width: 5px;
+}
+
+.node text {
+  fill: #000;
+  font: 20px sans-serif;
+  pointer-events: none;
+}
+
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.17/d3.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/crossfilter2/1.4.0-alpha.6/crossfilter.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dc/2.1.1/dc.js"></script>
+<script type="text/javascript" src="dcjs/data-grid.js"></script>
+<script type="text/javascript" src="dcjs/underscore-min.js"></script>
+
+<script src="dcjs/jquery.min.js"></script>
+<script src="dcjs/jquery.lazyload.js"></script>
+
+<body>
+
+
+
+<script>
+    function grid(selector, data) {
+
+        var ndx = crossfilter(data),
+            all = ndx.groupAll();
+
+        /////////////DEFINITIONS //////////////
+
+        //Capitalizes the first letter for each word in a senternce.
+        function toTitleCase(str) {
+            return str.replace(/\w\S*/g, function (txt) {
+                return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
+            });
+        }
+        function pad(n, width, z) {
+          z = z || '0';
+          n = n + '';
+          return n.length >= width ? n : new Array(width - n.length + 1).join(z) + n;
+        }
+
+        //Removes the Empty Bins from numeric-valued dimensions
+        function remove_empty_bins(source_group) {
+            return {
+                all: function () {
+                    return source_group.top(10).filter(function (d) {
+                        return d.value != 0;
+                    });
+                }
+            };
+        }
+
+        function remove_all_empty_bins(source_group) {
+            return {
+                all: function () {
+                    return source_group.all().filter(function (d) {
+                        return d.value != 0;
+                    });
+                }
+            };
+        }
+
+        //Removes the Empty Bins from text-valued dimensions
+        function remove_empty_text_bins(source_group) {
+            return {
+                all: function () {
+                    return source_group.top(4).filter(function (d) {
+                        return d.key != "";
+                    });
+                }
+            };
+        }
+        /////////////DEFINITIONS //////////////
+        //Formats Date data
+        function adjust(data) {
+            var dateFormat = d3.time.format("%m/%d/%Y %H:%M").parse;
+
+            data.forEach(function (e) {
+                e.d3time = dateFormat(e.timestamp);
+            });
+        }
+
+        adjust(data);
+        console.log(data)
+
+
+        ///////////////////////////////
+
+       /* // get the data
+d3.csv("force.csv", function(error, links) {
+
+var nodes = {};
+
+// Compute the distinct nodes from the links.
+links.forEach(function(link) {
+    link.source = nodes[link.source] ||
+        (nodes[link.source] = {name: link.source});
+    link.target = nodes[link.target] ||
+        (nodes[link.target] = {name: link.target});
+    link.value = +link.value;
+});
+console.log('old_nodes',nodes)
+console.log("old_links",links)
+})*/
+
+
+
+
+        //////////  Network Graph   /////////////////////////////////////
+        var graph= ndx.dimension(function (d) {
+            if (typeof d.location == "undefined") return "";
+            return [d.location_previous,d.location];
+        }, false);
+        var graph_group = graph.group().reduceSum(function (d) {return 1; });
+
+        var nodes = [];
+        graph_group.all().forEach(function(d){
+            if (nodes.map(function(e) { return e.name; }).indexOf(d.key[0]) ==-1){
+                nodes.push({name:d.key[0],group:0})
+        }});
+
+        var links = [];
+        graph_group.all().forEach(function(d){
+            var source_index = nodes.map(function(e) { return e.name; }).indexOf(d.key[0])
+            var target_index = nodes.map(function(e) { return e.name; }).indexOf(d.key[1])
+            var index_value = d.value
+            link={
+                source: source_index,
+                target: target_index,
+                value: index_value
+            }
+            links.push(link)
+        });
+        max_link_val = d3.max(links, function(d){ return Math.max(d.value); });
+        min_link_val = d3.min(links, function(d){ return Math.max(d.value); });
+
+        links.forEach(function(link) {
+            if ((link.value) <= min_link_val+.25*(max_link_val-min_link_val)) {
+                link.type = "twofive";
+            } else if ((link.value) <= min_link_val+.5*(max_link_val-min_link_val) && (link.value) > min_link_val+.25*(max_link_val-min_link_val)) {
+                link.type = "fivezero";
+            } else if ((link.value) <= min_link_val+.75*(max_link_val-min_link_val) && (link.value) > min_link_val+.5*(max_link_val-min_link_val)) {
+                link.type = "sevenfive";
+            } else if ((link.value) <= max_link_val && (link.value) > min_link_val+.75*(max_link_val-min_link_val)) {
+                link.type = "onezerozero";
+            }
+        });
+
+        console.log('nodes',nodes)
+        console.log("links",links)
+
+
+    var graph_width = 400,
+        graph_height = 500;
+
+    var force = d3.layout.force()
+        .size([graph_width, graph_height])
+        .linkDistance(250)
+        .charge(-500)
+        .nodes(nodes)
+        .links(links)
+        .start();
+
+    var graph_svg = d3.select("div.graph_network").append("svg")
+        .attr("width", graph_width)
+        .attr("height", graph_height);
+
+
+
+/*
+      var link = graph_svg.selectAll(".link")
+          .data(links)
+        .enter().append("line")
+          .attr("class", "link");
+*/
+        // build the arrow.
+        graph_svg.append("svg:defs").selectAll("marker")
+            .data(["end"])      // Different link/path types can be defined here
+          .enter().append("svg:marker")    // This section adds in the arrows
+            .attr("id", String)
+            .attr("viewBox", "0 -5 10 10")
+            .attr("refX", 15)
+            .attr("refY", -1.5)
+            .attr("markerWidth", 6)
+            .attr("markerHeight", 6)
+            .attr("orient", "auto")
+          .append("svg:path")
+            .attr("d", "M0,-5L10,0L0,5");
+
+        // add the links and the arrows
+        var path = graph_svg.append("svg:g").selectAll("path")
+            .data(force.links())
+          .enter().append("svg:path")
+            .attr("class", function(d) { return "link " + d.type; })
+            .attr("marker-end", "url(#end)");
+
+
+
+
+      var node = graph_svg.selectAll(".node")
+          .data(nodes)
+        .enter().append("g")
+          .attr("class", "node")
+          .call(force.drag);
+
+
+      // add the nodes
+        node.append("circle")
+        .attr("r", 5);
+
+      node.append("text")
+          .attr("dx", 12)
+          .attr("dy", ".35em")
+          .text(function(d) { return d.name });
+
+      force.on("tick", function() {
+        path.attr("d", function(d) {
+        var dx = d.target.x - d.source.x,
+            dy = d.target.y - d.source.y,
+            dr = Math.sqrt(dx * dx + dy * dy);
+        return "M" +
+            d.source.x + "," +
+            d.source.y + "A" +
+            dr + "," + dr + " 0 0,1 " +
+            d.target.x + "," +
+            d.target.y;
+    });
+
+        node.attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; });
+      });
+
+
+
+
+
+        ///////// Select Classification ///////////////
+        //Create row chart for top authors.
+        var row_classifications = dc.rowChart(selector + " .row_class");
+        var rowvar_class= ndx.dimension(function (d) {
+            if (typeof d.group == "undefined") return "";
+            return d.group;
+        }, false);
+        var rowvargroup_class = rowvar_class.group().reduceSum(function (d) {return 1; });
+        var rowvargroup_class_empty = remove_empty_text_bins(rowvargroup_class)
+        row_classifications
+            .width(350)
+            .height(250)
+            .dimension(rowvar_class)
+            .group(rowvargroup_class_empty)
+            .margins({top: 0, right: 5, bottom: 25, left: 5})
+            .gap(1)
+            .label(function (d) {
+                            return "(" + d.value + ") " + d.key;
+                        })
+            .ordering(function (kv) {
+                return -kv.value;
+            })
+            .labelOffsetX(5)
+            .elasticX(true)
+            .xAxis().ticks(2)
+
+        //Create row chart for booths.
+        var row_booths = dc.rowChart(selector + " .row_booth");
+        var rowvar_booth= ndx.dimension(function (d) {
+            if (typeof d.location == "undefined") return "";
+            return d.location;
+        }, false);
+        var rowvargroup_booth = rowvar_booth.group().reduceSum(function (d) {return 1; });
+        var rowvargroup_booth_empty = remove_empty_text_bins(rowvargroup_booth)
+        row_booths
+            .width(350)
+            .height(250)
+            .dimension(rowvar_booth)
+            .group(rowvargroup_booth_empty)
+            .margins({top: 0, right: 5, bottom: 25, left: 5})
+            .gap(1)
+            .label(function (d) {
+                            return "(" + d.value + ") " + d.key;
+                        })
+            .ordering(function (kv) {
+                return -kv.value;
+            })
+            .labelOffsetX(5)
+            .elasticX(true)
+            .xAxis().ticks(2)
+
+
+
+
+
+
+        //Linechart for timeline filtering.
+        var barchart_year = dc.barChart(selector + " .year_write_time");
+        var barvar_year = ndx.dimension(function (d) {
+            if (typeof d.d3time == "undefined") return "";
+           var d3format = d3.time.format("%m/%d/%Y %H:%M");
+            var newtime = new Date(d3format(d.d3time))
+            return new Date(roundQuarterHour(newtime));
+        });
+        var barvargroup_year = barvar_year.group();
+        var barvargroup_year_empty = remove_all_empty_bins(barvargroup_year);
+        console.log('year',barvargroup_year_empty.all())
+        min_time = d3.min(data, function(d){ return Math.min(d.d3time)/1000; });
+        max_time = d3.max(data, function(d){ return Math.max(d.d3time)/1000; });
+        console.log(min_time,max_time);
+        console.log(barvar_year.top(Infinity))
+        barchart_year
+            .width($('div.year_write_time').width())
+            .height(200)
+            .margins({top: 20, right: 50, bottom: 50, left: 75})
+            .x(d3.time.scale().domain([new Date(2018,5,20,12), new Date(2018,5,20,18)]))
+            .y(d3.scale.linear())//.domain([0, 20]))
+            .yAxis(d3.svg.axis().ticks(4).orient('left').tickFormat(function (d) {
+                return Math.round(d)
+            }))
+            //.xAxis(d3.svg.axis().ticks(10).orient('bottom').tickFormat(d3.time.format("%b %Y")).scale(d3.time.scale()
+            // .domain([min_time, max_time])))
+            //.xAxis()
+            //.xUnits(d3.time.minutes)
+            //.brushOn(true)
+            //.renderArea(true)
+            .elasticY(true)
+            .elasticX(true)
+            .yAxisLabel("Visit Count")
+            .xAxisLabel("Timestamp")
+            .dimension(barvar_year)
+            .group(barvargroup_year_empty)
+            .on("pretransition", function (c) {
+               rotateBarChartLabels('year_write_time');
+            });
+
+        function rotateBarChartLabels(classvar) {
+            d3.selectAll(selector + ' .'+classvar+' .axis.x text')
+                .style("text-anchor", "end")
+                .attr("transform", function (d) {
+                    return "rotate(-55, -4, 9) ";
+                });
+        }
+
+        function rotateBarRowLabels(classvar) {
+            d3.selectAll(selector + ' .'+classvar).selectAll('svg g text.y-axis-label.y-label')
+                .attr("transform", "rotate(-65)" )
+        }
+
+
+
+        function roundMinutes(date) {
+            date.setHours(date.getHours() + Math.round(date.getMinutes()/60));
+            date.setMinutes(0);
+            return date;}
+        function roundQuarterHour(date) {
+            date.setHours(date.getHours());
+            date.setMinutes(15*Math.round(date.getMinutes()/15));
+            return date;}
+
+        var barvar_hour = ndx.dimension(function (d) {
+            if (typeof d.d3time == "undefined") return "";
+            var d3format = d3.time.format("%m/%d/%Y %H:%M");
+            var newtime = new Date(d3format(d.d3time))
+            return new Date(roundMinutes(newtime));
+        });
+        ////////////////////////////////////////////
+
+        value_1_group = barvar_hour.group().reduce(
+          function (p, v) {
+              ++p.number;
+              p.total += +v.value_1;
+              p.avg = Math.round(10*p.total / p.number)/10;
+              return p;
+          },
+          function (p, v) {
+              --p.number;
+              p.total -= +v.value_1;
+              p.avg = (p.number == 0) ? 0 : Math.round(10*p.total / p.number)/10;
+              return p;
+          },
+          function () {
+              return {number: 0, total: 0, avg: 0}
+      })
+        value_1_group.all().forEach(function(d){d.value=d.value.total})
+        value_1_group_empty = remove_all_empty_bins(value_1_group)
+        ////////////////////////////////////////////
+
+
+        value_2_group = barvar_hour.group().reduce(
+          function (p, v) {
+              ++p.number;
+              p.total += +v.value_2;
+              p.avg = Math.round(10*p.total / p.number)/10;
+              return p;
+          },
+          function (p, v) {
+              --p.number;
+              p.total -= +v.value_2;
+              p.avg = (p.number == 0) ? 0 : Math.round(10*p.total / p.number)/10;
+              return p;
+          },
+          function () {
+              return {number: 0, total: 0, avg: 0}
+      })
+        value_2_group.all().forEach(function(d){d.value=d.value.avg})
+        value_2_group_empty = remove_all_empty_bins(value_2_group)
+        ////////////////////////////////////////////
+
+
+
+        value_3_group = barvar_hour.group().reduce(
+          function (p, v) {
+              ++p.number;
+              p.total += +v.value_3;
+              p.avg = Math.round(10*p.total / p.number)/10;
+              return p;
+          },
+          function (p, v) {
+              --p.number;
+              p.total -= +v.value_3;
+              p.avg = (p.number == 0) ? 0 : Math.round(10*p.total / p.number)/10;
+              return p;
+          },
+          function () {
+              return {number: 0, total: 0, avg: 0}
+      })
+        value_3_group.all().forEach(function(d){d.value=d.value.avg})
+        value_3_group_empty = remove_all_empty_bins(value_3_group)
+
+        //Linechart for timeline filtering.
+        var barchart_val1 = dc.barChart(selector + " .value_1");
+        min_time = d3.min(data, function(d){ return Math.min(d.d3time)/1000; });
+        max_time = d3.max(data, function(d){ return Math.max(d.d3time)/1000; });
+        barchart_val1
+            .width($('div.value_1').width())
+            .height(150)
+            .margins({top: 20, right: 50, bottom: 50, left: 75})
+            .x(d3.time.scale().domain([new Date(2018,5,20,12), new Date(2018,5,20,18)]))
+            .y(d3.scale.linear().domain([0,500]))
+            .yAxis(d3.svg.axis().ticks(4).orient('left').tickFormat(function (d) {
+                return Math.round(d)
+            }))
+            //.xAxis(d3.svg.axis().ticks(10).orient('bottom').tickFormat(d3.time.format("%b %Y")).scale(d3.time.scale()
+            // .domain([min_time, max_time])))
+            //.xAxis()
+            .xUnits(d3.time.hours)
+            //.brushOn(true)
+            //.renderArea(true)
+            //.elasticY(false)
+            .elasticX(true)
+            .yAxisLabel("Question 1")
+            //.xAxisLabel("Submission Date")
+            .dimension(barvar_hour)
+            .group(value_1_group_empty)
+            .on("pretransition", function (c) {
+               rotateBarChartLabels('value_1');
+            });
+
+        //Linechart for timeline filtering.
+        var barchart_val2 = dc.barChart(selector + " .value_2");
+        min_time = d3.min(data, function(d){ return Math.min(d.d3time)/1000; });
+        max_time = d3.max(data, function(d){ return Math.max(d.d3time)/1000; });
+        barchart_val2
+            .width($('div.value_2').width())
+            .height(150)
+            .margins({top: 20, right: 50, bottom: 50, left: 75})
+            .x(d3.time.scale().domain([new Date(2018,5,20,12), new Date(2018,5,20,18)]))
+            .y(d3.scale.linear().domain([0,5]))
+            .yAxis(d3.svg.axis().ticks(4).orient('left').tickFormat(function (d) {
+                return Math.round(d)
+            }))
+            //.xAxis(d3.svg.axis().ticks(10).orient('bottom').tickFormat(d3.time.format("%b %Y")).scale(d3.time.scale()
+            // .domain([min_time, max_time])))
+            //.xAxis()
+            .xUnits(d3.time.hours)
+            //.brushOn(true)
+            //.renderArea(true)
+            //.elasticY(false)
+            .elasticX(true)
+            .yAxisLabel("Question 2")
+            //.xAxisLabel("Submission Date")
+            .dimension(barvar_hour)
+            .group(value_2_group_empty)
+            .on("pretransition", function (c) {
+               rotateBarChartLabels('value_2');
+            });
+
+        //Linechart for timeline filtering.
+        var barchart_val3 = dc.barChart(selector + " .value_3");
+        min_time = d3.min(data, function(d){ return Math.min(d.d3time)/1000; });
+        max_time = d3.max(data, function(d){ return Math.max(d.d3time)/1000; });
+        barchart_val3
+            .width($('div.value_3').width())
+            .height(150)
+            .margins({top: 20, right: 50, bottom: 50, left: 75})
+            .x(d3.time.scale().domain([new Date(2018,5,20,12), new Date(2018,5,20,18)]))
+            .y(d3.scale.linear().domain([0,5]))
+            .yAxis(d3.svg.axis().ticks(4).orient('left').tickFormat(function (d) {
+                return Math.round(d)
+            }))
+            //.xAxis(d3.svg.axis().ticks(10).orient('bottom').tickFormat(d3.time.format("%b %Y")).scale(d3.time.scale()
+            // .domain([min_time, max_time])))
+            //.xAxis()
+            .xUnits(d3.time.hours)
+            //.brushOn(true)
+            //.renderArea(true)
+            //.elasticY(false)
+            .elasticX(true)
+            .yAxisLabel("Question 3")
+            //.xAxisLabel("Submission Date")
+            .dimension(barvar_hour)
+            .group(value_3_group_empty)
+            .on("pretransition", function (c) {
+               rotateBarChartLabels('value_3');
+
+            });
+
+
+
+
+
+
+        dc.renderAll()
+
+
+
+    }
+
+
+</script>
+
+
+
+<div class="container-fluid" style="padding-left:150px;padding-right:150px;">
+    <div id="event_data" style="padding-top:75px">
+        <section>
+            <div class="row">
+                <div class="col-md-4">
+                    <div id="obj_filter" class="row">
+                            <div class="row_class col-md-12">
+                                <h3 style="text-align:left">Person Classification</h3>
+                            </div>
+                            <div class="row_booth col-md-12">
+                                <h3 style="text-align:left">Booth</h3>
+                            </div>
+                    </div>
+                </div>
+                <div class="col-md-8">
+                    <div class="row">
+                        <div id="time_filter" class="col-md-6">
+                        <div class="value_1 col-md-12" style="text-align:left">
+                            <h2 style="padding-bottom:50px">Averaged Feedback Scores</h2>
+                        </div>
+                        <div class="value_2 col-md-12" style="text-align:left"></div>
+                        <div class="value_3 col-md-12" style="text-align:left"></div>
+                        <div class="year_write_time col-md-12"></div>
+                    </div>
+                        <div id="graph_network" class="col-md-6">
+                            <div class="graph_network" style="text-align:right; padding-left:25px;">
+                                <h2>Booth Visit Network</h2>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+
+
+    </div>
+</div>
+
+
+</body>
+<script>
+   $(function() {
+            d3.csv("dummy_data.csv", function (d) {
+                    return d;
+                }
+                , function (error, rows) {
+                    grid("#event_data", rows);
+                });
+        });
+</script>
+
+</html>
