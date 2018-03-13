@@ -193,7 +193,7 @@ console.log("old_links",links)
         console.log("links",links)
 
 
-    var graph_width = 400,
+    var graph_width = $('div.graph_network').width(),
         graph_height = 500;
 
     var force = d3.layout.force()
@@ -287,7 +287,7 @@ console.log("old_links",links)
         var rowvargroup_class = rowvar_class.group().reduceSum(function (d) {return 1; });
         var rowvargroup_class_empty = remove_empty_text_bins(rowvargroup_class)
         row_classifications
-            .width(350)
+            .width($('div.row_class').width())
             .height(250)
             .dimension(rowvar_class)
             .group(rowvargroup_class_empty)
@@ -312,7 +312,7 @@ console.log("old_links",links)
         var rowvargroup_booth = rowvar_booth.group().reduceSum(function (d) {return 1; });
         var rowvargroup_booth_empty = remove_empty_text_bins(rowvargroup_booth)
         row_booths
-            .width(350)
+            .width($('div.row_booth').width())
             .height(250)
             .dimension(rowvar_booth)
             .group(rowvargroup_booth_empty)
@@ -575,27 +575,27 @@ console.log("old_links",links)
     <div id="event_data" style="padding-top:75px">
         <section>
             <div class="row">
-                <div class="col-md-4">
+                <div class="col-lg-4 ">
                     <div id="obj_filter" class="row">
-                            <div class="row_class col-md-12">
+                            <div class="row_class">
                                 <h3 style="text-align:left">Person Classification</h3>
                             </div>
-                            <div class="row_booth col-md-12">
+                    </div>
+                    <div id="obj_booth" class="row">
+                            <div class="row_booth">
                                 <h3 style="text-align:left">Booth</h3>
                             </div>
                     </div>
                 </div>
-                <div class="col-md-4">
-                    <div id="time_filter" class="col-md-12">
+                <div class="col-lg-4">
                         <div class="value_1 col-md-12" style="text-align:left">
                             <h2 style="padding-bottom:50px">Averaged Feedback Scores</h2>
                         </div>
                         <div class="value_2 col-md-12" style="text-align:left"></div>
                         <div class="value_3 col-md-12" style="text-align:left"></div>
                         <div class="year_write_time col-md-12"></div>
-                    </div>
                 </div>
-                <div class="col-md-4">
+                <div class="col-lg-4">
                         <div id="graph_network" class="col-md-12">
                             <div class="graph_network" style="text-align:right; padding-left:25px;">
                                 <h2>Booth Visit Network</h2>
