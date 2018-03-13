@@ -17,18 +17,22 @@ path.link {
 
 path.link.twofive {
   opacity: 0.25;
+  stroke-width:1px;
 }
 
 path.link.fivezero {
   opacity: 0.50;
+    stroke-width:2px;
 }
 
 path.link.sevenfive {
   opacity: 0.75;
+    stroke-width:3px;
 }
 
 path.link.onezerozero {
   opacity: 1.0;
+    stroke-width:4px;
 }
 
 
@@ -250,6 +254,7 @@ console.log("old_links",links)
       node.append("text")
           .attr("dx", 12)
           .attr("dy", ".35em")
+          .style('font-size','30px')
           .text(function(d) { return d.name });
 
       force.on("tick", function() {
@@ -580,9 +585,8 @@ console.log("old_links",links)
                             </div>
                     </div>
                 </div>
-                <div class="col-md-8">
-                    <div class="row">
-                        <div id="time_filter" class="col-md-6">
+                <div class="col-md-4">
+                    <div id="time_filter" class="col-md-12">
                         <div class="value_1 col-md-12" style="text-align:left">
                             <h2 style="padding-bottom:50px">Averaged Feedback Scores</h2>
                         </div>
@@ -590,12 +594,13 @@ console.log("old_links",links)
                         <div class="value_3 col-md-12" style="text-align:left"></div>
                         <div class="year_write_time col-md-12"></div>
                     </div>
-                        <div id="graph_network" class="col-md-6">
+                </div>
+                <div class="col-md-4">
+                        <div id="graph_network" class="col-md-12">
                             <div class="graph_network" style="text-align:right; padding-left:25px;">
                                 <h2>Booth Visit Network</h2>
                             </div>
                         </div>
-                    </div>
 
                 </div>
             </div>
